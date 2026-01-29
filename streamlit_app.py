@@ -103,13 +103,13 @@ if st.button("🌟 啟動 Pro 思考模式解讀", type="primary"):
                 content_parts.append(editable_prompt)
 
                 # 呼叫 API (配置思考預算)
-                response = model.generate_content(
-                    content_parts,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.8,)
-                    ),
-                    stream=True
-
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.8,
+            ),
+            stream=True
+        )
                 # 串流輸出結果
                 output_area = st.empty()
                 full_text = ""
