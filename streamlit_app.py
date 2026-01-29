@@ -12,15 +12,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 自定義 CSS：強化隱藏 Header 與 Footer
+# 自定義 CSS
 st.markdown("""
     <style>
-    /* 隱藏頂部工具列 (包含 View Source, GitHub 圖示等) */
-    header[data-testid="stHeader"] {
-        visibility: hidden;
-        height: 0%;
-    }
-    
     /* 隱藏底部標籤 */
     footer {
         visibility: hidden;
@@ -48,21 +42,17 @@ st.markdown("""
     .stTextArea textarea { font-family: 'Courier New', Courier, monospace; background-color: #0f172a; color: #cbd5e1; border-color: #1e293b; }
     .stSelectbox label, .stTextInput label { color: #94a3b8 !important; font-size: 0.8rem !important; text-transform: uppercase; letter-spacing: 1px; }
     
-    /* 調整主要內容區域，補償 header 隱藏後的間距 */
     .block-container {
-        padding-top: 2rem !important;
+        padding-top: 1.5rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. 安全取得 API Key
+# 2. API Key 初始化 (簡化版)
 def init_gemini():
-    api_key = None
-    if "GEMINI_API_KEY" in st.secrets:
-        api_key = st.secrets["GEMINI_API_KEY"]
-    
+    api_key = st.secrets.get("GEMINI_API_KEY")
     if not api_key:
-        api_key = st.sidebar.text_input("🔑 請輸入 Gemini API Key", type="password", help="請前往 Google AI Studio 取得 Key")
+        api_key = st.sidebar.text_input("🔑 請輸入 Gemini API Key", type="password")
     
     if api_key:
         genai.configure(api_key=api_key)
@@ -105,7 +95,6 @@ with st.sidebar:
     is_ready = init_gemini()
     
     st.subheader("🛠️ 指令配置")
-    
     cat_name = st.selectbox("1. 功能分類", list(PROMPT_CATEGORIES.keys()))
     items_in_cat = PROMPT_CATEGORIES[cat_name]
     selected_label = st.selectbox("2. 具體指令", [i["label"] for i in items_in_cat])
@@ -123,7 +112,6 @@ with st.sidebar:
     final_prompt = template.replace("{current_job}", job if job else "[自由業]") \
                            .replace("{strength_a}", sa if sa else "[未指定]") \
                            .replace("{strength_b}", sb if sb else "[未指定]")
-    
     final_prompt += style_suffix
     
     st.markdown("---")
@@ -145,7 +133,7 @@ st.markdown("---")
 
 if st.button("🌟 啟動 AI 智慧命理分析", type="primary"):
     if not is_ready:
-        st.error("請先設定 API Key")
+        st.error("請在側邊欄輸入 API Key")
     elif not uploaded_files:
         st.warning("請先上傳命盤截圖")
     else:
@@ -162,30 +150,15 @@ if st.button("🌟 啟動 AI 智慧命理分析", type="primary"):
                     inputs.append(img)
                 inputs.append(prompt_to_send)
 
-                response = model.generate_content(
-                    inputs,
-                    generation_config=genai.types.GenerationConfig(temperature=0.7),
-                    stream=True
-                )
+                response = model.generate_content(inputs, config={"temperature": 0.7})
 
                 st.subheader("📝 深度分析報告")
-                res_area = st.empty()
-                full_text = ""
-                
-                for chunk in response:
-                    if chunk.text:
-                        full_text += chunk.text
-                        res_area.markdown(full_text)
-                
+                st.markdown(response.text)
                 st.success("解讀完成")
                 st.balloons()
                 
             except Exception as e:
-                err_msg = str(e)
-                if "429" in err_msg:
-                    st.error("🚨 配額超出限制：請等待 60 秒後再試。")
-                else:
-                    st.error(f"分析失敗：{err_msg}")
+                st.error(f"分析失敗：{str(e)}")
 
 st.markdown("---")
 st.caption("© 2025 CelestialLens • Powered by Gemini 3 Flash")
