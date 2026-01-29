@@ -12,14 +12,46 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 自定義 CSS
+# 自定義 CSS：強化隱藏 Header 與 Footer
 st.markdown("""
     <style>
+    /* 隱藏頂部工具列 (包含 View Source, GitHub 圖示等) */
+    header[data-testid="stHeader"] {
+        visibility: hidden;
+        height: 0%;
+    }
+    
+    /* 隱藏底部標籤 */
+    footer {
+        visibility: hidden;
+        height: 0%;
+    }
+
+    /* 頁面背景與按鈕樣式 */
     .main { background-color: #020617; color: #f8fafc; }
-    .stButton>button { width: 100%; border-radius: 12px; height: 3.5rem; font-weight: bold; background: linear-gradient(45deg, #f59e0b, #ea580c); color: white; border: none; font-size: 1.1rem; }
-    .stButton>button:hover { transform: scale(1.02); transition: 0.2s; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); }
+    .stButton>button { 
+        width: 100%; 
+        border-radius: 12px; 
+        height: 3.5rem; 
+        font-weight: bold; 
+        background: linear-gradient(45deg, #f59e0b, #ea580c); 
+        color: white; 
+        border: none; 
+        font-size: 1.1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    .stButton>button:hover { 
+        transform: translateY(-2px);
+        transition: 0.2s; 
+        box-shadow: 0 10px 15px -3px rgba(245, 158, 11, 0.4); 
+    }
     .stTextArea textarea { font-family: 'Courier New', Courier, monospace; background-color: #0f172a; color: #cbd5e1; border-color: #1e293b; }
     .stSelectbox label, .stTextInput label { color: #94a3b8 !important; font-size: 0.8rem !important; text-transform: uppercase; letter-spacing: 1px; }
+    
+    /* 調整主要內容區域，補償 header 隱藏後的間距 */
+    .block-container {
+        padding-top: 2rem !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -66,23 +98,19 @@ STYLE_OPTIONS = {
 
 # 4. 側邊欄 UI
 with st.sidebar:
-    st.title("🔮 CelestialLens Flash")
-    st.caption("AI 命理戰略系統 v3.0")
+    st.title("🔮 CelestialLens")
+    st.caption("AI 命理戰略系統 v3.1")
     st.markdown("---")
     
     is_ready = init_gemini()
     
     st.subheader("🛠️ 指令配置")
     
-    # 三段式選單
     cat_name = st.selectbox("1. 功能分類", list(PROMPT_CATEGORIES.keys()))
-    
     items_in_cat = PROMPT_CATEGORIES[cat_name]
     selected_label = st.selectbox("2. 具體指令", [i["label"] for i in items_in_cat])
-    
     style_name = st.selectbox("3. 語氣風格", list(STYLE_OPTIONS.keys()))
     
-    # 取得範本與後綴
     template = next(i["template"] for i in items_in_cat if i["label"] == selected_label)
     style_suffix = STYLE_OPTIONS[style_name]
     
@@ -92,7 +120,6 @@ with st.sidebar:
     sa = st.text_input("強項 A", placeholder="例如：邏輯分析")
     sb = st.text_input("強項 B", placeholder="例如：創意寫作")
     
-    # 合成提示詞
     final_prompt = template.replace("{current_job}", job if job else "[自由業]") \
                            .replace("{strength_a}", sa if sa else "[未指定]") \
                            .replace("{strength_b}", sb if sb else "[未指定]")
@@ -104,12 +131,11 @@ with st.sidebar:
 
 # 5. 主畫面 UI
 st.title("CelestialLens AI 命盤深度解讀")
-st.info("💡 目前預設使用 **Gemini 3 Flash** 模型，提供最穩定且快速的解讀體驗。")
+st.info("💡 目前使用 **Gemini 3 Flash** 引擎。")
 
 uploaded_files = st.file_uploader("📸 請上傳命盤截圖 (可多選)", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 
 if uploaded_files:
-    # 顯示上傳圖片縮圖
     cols = st.columns(min(len(uploaded_files), 5))
     for i, file in enumerate(uploaded_files):
         with cols[i % 5]:
@@ -125,20 +151,17 @@ if st.button("🌟 啟動 AI 智慧命理分析", type="primary"):
     else:
         with st.spinner("正在接收星辰智慧..."):
             try:
-                # 建立模型實例
                 model = genai.GenerativeModel(
                     model_name="gemini-3-flash-preview",
                     system_instruction="你是一位精通八字、紫微斗數與現代職涯戰略的命理專家。請使用 Markdown 格式提供專業解讀。應包含表格整理與重點條列。"
                 )
 
-                # 準備輸入資料
                 inputs = []
                 for f in uploaded_files:
                     img = Image.open(f)
                     inputs.append(img)
                 inputs.append(prompt_to_send)
 
-                # 發送請求
                 response = model.generate_content(
                     inputs,
                     generation_config=genai.types.GenerationConfig(temperature=0.7),
@@ -160,7 +183,7 @@ if st.button("🌟 啟動 AI 智慧命理分析", type="primary"):
             except Exception as e:
                 err_msg = str(e)
                 if "429" in err_msg:
-                    st.error("🚨 配額超出限制：請等待 60 秒後再試，或更換 API Key。")
+                    st.error("🚨 配額超出限制：請等待 60 秒後再試。")
                 else:
                     st.error(f"分析失敗：{err_msg}")
 
