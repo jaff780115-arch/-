@@ -106,9 +106,8 @@ if st.button("🌟 啟動 Pro 思考模式解讀", type="primary"):
                 response = model.generate_content(
                     content_parts,
                     generation_config=genai.types.GenerationConfig(
-                        temperature=0.8,
-                        # Python SDK 的 Thinking 設定
-                )
+                        temperature=0.8,)
+                       
 
                 # 串流輸出結果
                 output_area = st.empty()
