@@ -5,11 +5,6 @@ export interface ChartImage {
   preview: string;
 }
 
-export interface AnalysisResult {
-  text: string;
-  timestamp: number;
-}
-
 export interface PromptItem {
   id: string;
   label: string;
@@ -21,6 +16,13 @@ export interface PromptCategory {
   title: string;
   items: PromptItem[];
 }
+
+export const STYLE_OPTIONS = [
+  { id: 'default', label: '預設風格', suffix: '' },
+  { id: 'plain', label: '白話解讀', suffix: '\n\n請幫我將以上分析，用非常白話、好理解的方式解讀。' },
+  { id: 'spiritual', label: '身心靈解讀', suffix: '\n\n請幫我將以上分析，用身心靈與內在探索的方式解讀。' },
+  { id: 'energy', label: '能量角度解讀', suffix: '\n\n請幫我將以上分析，從能量場與頻率的角度進行解讀。' },
+];
 
 export const PROMPT_CATEGORIES: PromptCategory[] = [
   {
@@ -60,14 +62,6 @@ export const PROMPT_CATEGORIES: PromptCategory[] = [
         template: "請你進入『職業戰略家』模式。根據剛才解析的八字十神格局，我注意到我有 [強項 A：{strength_a}] 與 [強項 B：{strength_b}] 這兩種能量。\n\n請幫我依序進行以下探索：\na. 化學反應分析：這兩種能量結合時，會產生什麼樣的『獨特工作風格』？\nb. 跨領域提案：請提出 3 個非傳統、具備未來感的『職業組合』，這些組合必須能同時發揮我的技術才華與內在價值感。\nc. 避坑指南：在整合這些能力時，我最容易遇到的『自我內耗』點是什麼？",
         hasVariables: true
       }
-    ]
-  },
-  {
-    title: "四. 語氣風格轉換",
-    items: [
-      { id: "style_1", label: "白話解讀", template: "請幫我將以上分析，用白話的方式解讀。" },
-      { id: "style_2", label: "身心靈解讀", template: "請幫我將以上分析，用身心靈的方式解讀。" },
-      { id: "style_3", label: "能量角度解讀", template: "請幫我將以上分析，用能量的方式解讀。" }
     ]
   }
 ];

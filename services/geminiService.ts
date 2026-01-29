@@ -7,10 +7,8 @@ export const analyzeCharts = async (
   prompt: string,
   onStream?: (chunk: string) => void
 ): Promise<string> => {
-  // 使用最新 API Key
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // 圖片處理
   const imageParts = await Promise.all(
     images.map(async (img) => {
       const base64Data = await fileToBase64(img.file);
@@ -27,18 +25,14 @@ export const analyzeCharts = async (
 
   try {
     const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-3-pro-preview', // 升級為 Pro 預覽版
+      model: 'gemini-3-flash-preview', 
       contents: { 
         parts: [...imageParts, textPart] 
       },
       config: {
-        systemInstruction: "你是一位精通八字、紫微斗數、三元九運與現代職業戰略的頂尖玄學專家。你擅長將古老的東方智慧轉化為具備未來感、跨領域且符合現代趨勢的實戰建議。你的目標是幫助命主找到其在地球上的『原廠設定』並發揮最大天賦。解讀時請使用 Markdown 格式，表格必須清晰，語氣根據用戶要求調整。",
-        temperature: 0.8,
-        topP: 0.95,
-        // 啟用思考模式 (Thinking Mode)
-        thinkingConfig: {
-          thinkingBudget: 32768
-        }
+        systemInstruction: "你是一位精通八字與紫微的命理專家。請使用 Markdown 格式提供清晰的分析。回答應包含結構化表格與條列式建議，語氣專業且富有啟發性。",
+        temperature: 0.7,
+        topP: 0.9,
       },
     });
 
@@ -50,9 +44,12 @@ export const analyzeCharts = async (
     }
 
     return fullText;
-  } catch (error) {
-    console.error("Gemini Pro Analysis Error:", error);
-    throw new Error("解讀過程中發生錯誤，可能與模型限制或網路有關，請稍後再試。");
+  } catch (error: any) {
+    console.error("Gemini Flash Analysis Error:", error);
+    if (error.message?.includes("429")) {
+      throw new Error("配額已達上限，請稍候一分鐘再試，或檢查您的 API 計費設定。");
+    }
+    throw new Error("解讀過程中發生錯誤，請稍後再試。");
   }
 };
 

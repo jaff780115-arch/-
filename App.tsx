@@ -1,29 +1,29 @@
 
-import React, { useState, useRef } from 'react';
-import { ChartImage, PROMPT_CATEGORIES, PromptItem } from './types';
+import React, { useState, useRef, useEffect } from 'react';
+import { ChartImage, PROMPT_CATEGORIES, STYLE_OPTIONS, PromptItem } from './types';
 import { analyzeCharts } from './services/geminiService';
 import { 
   Sparkles, 
   Upload, 
   Trash2, 
-  Send, 
   Loader2, 
   Image as ImageIcon,
   History,
-  Info,
-  ChevronRight,
   BrainCircuit,
-  Settings2
+  LayoutGrid,
+  Zap,
+  MessageSquareQuote
 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [images, setImages] = useState<ChartImage[]>([]);
+  const [selectedCatIndex, setSelectedCatIndex] = useState(0);
+  const [selectedItemIndex, setSelectedItemIndex] = useState(0);
+  const [selectedStyleId, setSelectedStyleId] = useState('default');
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<string>('');
-  const [history, setHistory] = useState<{ prompt: string, result: string, date: string }[]>([]);
   
-  // 變數狀態
   const [vars, setVars] = useState({
     current_job: '',
     strength_a: '',
@@ -32,6 +32,13 @@ const App: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultEndRef = useRef<HTMLDivElement>(null);
+
+  // 當選擇變更時，自動更新預覽指令
+  useEffect(() => {
+    const item = PROMPT_CATEGORIES[selectedCatIndex].items[selectedItemIndex];
+    const style = STYLE_OPTIONS.find(s => s.id === selectedStyleId);
+    setCustomPrompt(item.template + (style?.suffix || ''));
+  }, [selectedCatIndex, selectedItemIndex, selectedStyleId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -46,10 +53,9 @@ const App: React.FC = () => {
 
   const removeImage = (id: string) => {
     setImages(prev => {
-      const filtered = prev.filter(img => img.id !== id);
       const removed = prev.find(img => img.id === id);
       if (removed) URL.revokeObjectURL(removed.preview);
-      return filtered;
+      return prev.filter(img => img.id !== id);
     });
   };
 
@@ -58,105 +64,66 @@ const App: React.FC = () => {
       alert('請先上傳命盤截圖');
       return;
     }
-    
-    let finalPrompt = customPrompt.trim() || PROMPT_CATEGORIES[0].items[0].template;
-    
-    // 處理變數替換
+
+    let finalPrompt = customPrompt.trim();
     finalPrompt = finalPrompt
-      .replace(/{current_job}/g, vars.current_job || "[未填寫]")
-      .replace(/{strength_a}/g, vars.strength_a || "[未填寫]")
-      .replace(/{strength_b}/g, vars.strength_b || "[未填寫]");
+      .replace(/{current_job}/g, vars.current_job || "[自由業]")
+      .replace(/{strength_a}/g, vars.strength_a || "[未指定]")
+      .replace(/{strength_b}/g, vars.strength_b || "[未指定]");
 
     setIsAnalyzing(true);
     setResult('');
     
     try {
-      const fullResult = await analyzeCharts(images, finalPrompt, (chunk) => {
+      await analyzeCharts(images, finalPrompt, (chunk) => {
         setResult(prev => prev + chunk);
         resultEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       });
-      
-      setHistory(prev => [{
-        prompt: finalPrompt,
-        result: fullResult,
-        date: new Date().toLocaleString()
-      }, ...prev].slice(0, 10));
-
     } catch (error: any) {
-      setResult(`錯誤: ${error.message}`);
+      setResult(`解讀失敗：${error.message}`);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const useTemplate = (item: PromptItem) => {
-    setCustomPrompt(item.template);
-  };
-
-  const updateVar = (key: keyof typeof vars, val: string) => {
-    setVars(prev => ({ ...prev, [key]: val }));
-  };
-
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-200 selection:bg-amber-500/30">
-      {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-900/40 backdrop-blur-xl sticky top-0 z-50">
+    <div className="min-h-screen bg-[#020617] text-slate-200">
+      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-gradient-to-tr from-amber-500 to-orange-600 p-1.5 rounded-xl shadow-lg shadow-orange-900/20">
-              <BrainCircuit className="w-5 h-5 text-slate-950" />
-            </div>
-            <h1 className="text-xl font-bold font-serif tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">
-              CelestialLens <span className="text-xs font-normal text-slate-500 ml-1">Pro Thinking</span>
+          <div className="flex items-center gap-3">
+            <Zap className="w-6 h-6 text-amber-500 fill-amber-500" />
+            <h1 className="text-xl font-bold font-serif bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">
+              CelestialLens <span className="text-xs font-normal text-slate-500 ml-1">Flash Edition</span>
             </h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setHistory([])}
-              className="p-2 text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              <History className="w-5 h-5" />
-            </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Data & Setup */}
-        <div className="lg:col-span-5 space-y-6">
+        {/* 控制面板 */}
+        <div className="lg:col-span-4 space-y-6">
           
-          {/* Step 1: Chart Upload */}
-          <section className="bg-slate-900/30 border border-slate-800/60 rounded-3xl p-6 backdrop-blur-sm shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-amber-500" />
-                命盤截圖
-              </h2>
-              <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">{images.length} 份資料</span>
-            </div>
-            
+          {/* 上傳區 */}
+          <section className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5">
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <ImageIcon className="w-3.5 h-3.5" /> 命盤資料
+            </h2>
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-amber-500/30 hover:bg-slate-800/20 transition-all group"
+              className="border-2 border-dashed border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-800/30 transition-all group"
             >
-              <Upload className="w-8 h-8 text-slate-700 mb-2 group-hover:text-amber-500 transition-colors" />
-              <p className="text-xs text-slate-500">上傳八字、紫微、或合婚截圖</p>
-              <input 
-                type="file" multiple accept="image/*" className="hidden" 
-                ref={fileInputRef} onChange={handleFileChange}
-              />
+              <Upload className="w-6 h-6 text-slate-600 mb-2 group-hover:text-amber-500" />
+              <p className="text-[10px] text-slate-500">點擊上傳多張截圖</p>
+              <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
             </div>
 
             {images.length > 0 && (
-              <div className="mt-4 flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+              <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
                 {images.map((img) => (
-                  <div key={img.id} className="relative shrink-0 w-20 aspect-square rounded-xl overflow-hidden border border-slate-800 ring-1 ring-white/5">
-                    <img src={img.preview} alt="preview" className="w-full h-full object-cover" />
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); removeImage(img.id); }}
-                      className="absolute top-1 right-1 bg-black/60 backdrop-blur-md p-1 rounded-md text-white/70 hover:text-red-400"
-                    >
-                      <Trash2 className="w-3 h-3" />
+                  <div key={img.id} className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-800 shrink-0">
+                    <img src={img.preview} className="w-full h-full object-cover" />
+                    <button onClick={() => removeImage(img.id)} className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <Trash2 className="w-3 h-3 text-red-400" />
                     </button>
                   </div>
                 ))}
@@ -164,177 +131,126 @@ const App: React.FC = () => {
             )}
           </section>
 
-          {/* Step 2: Specialized Prompts */}
-          <section className="bg-slate-900/30 border border-slate-800/60 rounded-3xl p-6 backdrop-blur-sm shadow-xl">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2 mb-4">
-              <Settings2 className="w-4 h-4 text-amber-500" />
-              AI 戰略指令集
+          {/* 指令設定區 */}
+          <section className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <LayoutGrid className="w-3.5 h-3.5" /> 指令配置
             </h2>
             
-            <div className="space-y-6">
-              {PROMPT_CATEGORIES.map((cat, i) => (
-                <div key={i} className="space-y-2">
-                  <h3 className="text-xs font-medium text-slate-500 px-1">{cat.title}</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {cat.items.map((item) => (
-                      <button 
-                        key={item.id}
-                        onClick={() => useTemplate(item)}
-                        className="text-[11px] px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 hover:bg-amber-500 hover:text-slate-950 hover:border-amber-500 transition-all text-slate-300"
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] text-slate-500 block mb-1">1. 功能分類</label>
+                <select 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm outline-none focus:border-amber-500/50"
+                  value={selectedCatIndex}
+                  onChange={(e) => { setSelectedCatIndex(Number(e.target.value)); setSelectedItemIndex(0); }}
+                >
+                  {PROMPT_CATEGORIES.map((cat, i) => <option key={i} value={i}>{cat.title}</option>)}
+                </select>
+              </div>
 
-            {/* Variable Inputs */}
-            <div className="mt-6 pt-6 border-t border-slate-800/50 space-y-4">
-              <div className="grid grid-cols-1 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 uppercase font-bold px-1">目前從事職業 (OO)</label>
-                  <input 
-                    type="text" value={vars.current_job} onChange={e => updateVar('current_job', e.target.value)}
-                    placeholder="例如：行銷主管、自由接案者..."
-                    className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-xs focus:ring-1 focus:ring-amber-500/50 outline-none"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-500 uppercase font-bold px-1">強項 A</label>
-                    <input 
-                      type="text" value={vars.strength_a} onChange={e => updateVar('strength_a', e.target.value)}
-                      placeholder="例如：溝通"
-                      className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-xs focus:ring-1 focus:ring-amber-500/50 outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-500 uppercase font-bold px-1">強項 B</label>
-                    <input 
-                      type="text" value={vars.strength_b} onChange={e => updateVar('strength_b', e.target.value)}
-                      placeholder="例如：美感"
-                      className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-xs focus:ring-1 focus:ring-amber-500/50 outline-none"
-                    />
-                  </div>
-                </div>
+              <div>
+                <label className="text-[10px] text-slate-500 block mb-1">2. 具體指令</label>
+                <select 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm outline-none focus:border-amber-500/50"
+                  value={selectedItemIndex}
+                  onChange={(e) => setSelectedItemIndex(Number(e.target.value))}
+                >
+                  {PROMPT_CATEGORIES[selectedCatIndex].items.map((item, i) => <option key={i} value={i}>{item.label}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-500 block mb-1">3. 語氣風格</label>
+                <select 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm outline-none focus:border-amber-500/50"
+                  value={selectedStyleId}
+                  onChange={(e) => setSelectedStyleId(e.target.value)}
+                >
+                  {STYLE_OPTIONS.map((style) => <option key={style.id} value={style.id}>{style.label}</option>)}
+                </select>
               </div>
             </div>
 
-            <div className="mt-6">
-              <textarea 
-                value={customPrompt}
-                onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder="在此編輯或預覽最終指令..."
-                className="w-full h-32 bg-slate-950/50 border border-slate-800 rounded-xl p-3 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500/50 resize-none font-mono text-slate-400"
+            {/* 參數輸入 */}
+            <div className="pt-4 border-t border-slate-800 space-y-3">
+              <input 
+                type="text" placeholder="目前職業 (選填)" value={vars.current_job}
+                onChange={e => setVars({...vars, current_job: e.target.value})}
+                className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-xs outline-none"
               />
+              <div className="grid grid-cols-2 gap-2">
+                <input 
+                  type="text" placeholder="強項 A" value={vars.strength_a}
+                  onChange={e => setVars({...vars, strength_a: e.target.value})}
+                  className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-xs outline-none"
+                />
+                <input 
+                  type="text" placeholder="強項 B" value={vars.strength_b}
+                  onChange={e => setVars({...vars, strength_b: e.target.value})}
+                  className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-xs outline-none"
+                />
+              </div>
             </div>
+
+            <textarea 
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              className="w-full h-24 bg-slate-950/30 border border-slate-800 rounded-lg p-2 text-[10px] font-mono text-slate-500 resize-none outline-none"
+            />
           </section>
 
           <button 
             disabled={isAnalyzing || images.length === 0}
             onClick={startAnalysis}
-            className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl ${
+            className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
               isAnalyzing || images.length === 0 
-              ? 'bg-slate-800 text-slate-600 cursor-not-allowed' 
-              : 'bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 hover:scale-[1.01] active:scale-[0.98] shadow-orange-950/20'
+              ? 'bg-slate-800 text-slate-600' 
+              : 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-lg shadow-amber-900/20'
             }`}
           >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                正在啟動 Pro 思考模式...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-5 h-5" />
-                開始 AI 深度解讀
-              </>
-            )}
+            {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+            {isAnalyzing ? '正在解讀命盤...' : '開始 AI 命理分析'}
           </button>
         </div>
 
-        {/* Right Column: Deep Analysis Result */}
-        <div className="lg:col-span-7 flex flex-col min-h-[700px]">
-          <div className="flex-1 bg-slate-900/20 border border-slate-800/40 rounded-[2.5rem] p-8 relative flex flex-col shadow-2xl backdrop-blur-md">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="font-serif text-2xl italic text-amber-500">Strategic Insight</h3>
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Generated by Gemini 3 Pro</p>
-              </div>
-              <div className="flex gap-1.5">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-slate-800 shadow-inner"></div>
-                ))}
-              </div>
+        {/* 結果顯示區 */}
+        <div className="lg:col-span-8">
+          <div className="bg-slate-900/20 border border-slate-800 rounded-3xl p-6 min-h-[600px] flex flex-col backdrop-blur-sm">
+            <div className="flex items-center gap-3 mb-6 border-b border-slate-800/50 pb-4">
+              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+              <h3 className="font-serif text-lg text-slate-300">Analysis Report</h3>
+              <span className="text-[10px] text-slate-600 ml-auto uppercase tracking-tighter">Gemini 3 Flash</span>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-6 pr-4 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
               {!result && !isAnalyzing ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-700 text-center space-y-4">
-                  <div className="p-6 bg-slate-900/50 rounded-full ring-1 ring-slate-800">
-                    <BrainCircuit className="w-12 h-12 opacity-10" />
-                  </div>
-                  <div className="max-w-xs">
-                    <p className="text-sm font-medium">準備進行高階命理運算</p>
-                    <p className="text-xs text-slate-600 mt-1">請上傳您的命盤資料，並從左側選擇解讀角度。Pro 模型將會進行深度鏈式思考。</p>
-                  </div>
+                <div className="h-full flex flex-col items-center justify-center text-slate-700 opacity-40">
+                  <BrainCircuit className="w-16 h-16 mb-4" />
+                  <p className="text-sm">等待輸入資料與指令</p>
                 </div>
               ) : (
-                <div className="prose prose-invert prose-amber prose-sm max-w-none">
-                  {/* Markdown content container */}
-                  <div className="whitespace-pre-wrap leading-relaxed text-slate-300 font-light text-base">
+                <div className="prose prose-invert prose-amber max-w-none">
+                  <div className="text-slate-300 leading-relaxed whitespace-pre-wrap">
                     {result}
                   </div>
                   <div ref={resultEndRef} />
                 </div>
               )}
             </div>
-
+            
             {isAnalyzing && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-4 pointer-events-none">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-amber-500/20 blur-3xl rounded-full animate-pulse"></div>
-                  <Loader2 className="w-12 h-12 text-amber-500 animate-spin relative z-10" />
-                </div>
-                <div className="bg-slate-950/80 backdrop-blur-xl px-5 py-2.5 rounded-2xl border border-slate-800 flex items-center gap-3">
-                  <div className="flex gap-1">
-                    <span className="w-1 h-1 bg-amber-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                    <span className="w-1 h-1 bg-amber-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                    <span className="w-1 h-1 bg-amber-500 rounded-full animate-bounce"></span>
-                  </div>
-                  <span className="text-[10px] uppercase tracking-[0.2em] font-black text-amber-500/80">Pro Thinking Active</span>
-                </div>
+              <div className="flex items-center gap-2 mt-4 text-xs text-amber-500/60 font-medium">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                正在接收 AI 智慧串流...
               </div>
             )}
           </div>
-          
-          {/* Legend / Tips */}
-          <div className="mt-6 flex flex-wrap gap-4 px-4 justify-center">
-            <div className="flex items-center gap-2 text-[10px] text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-amber-500/50"></span>
-              <span>思考模式已開啟 (32k)</span>
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-orange-500/50"></span>
-              <span>Gemini 3 Pro Preview</span>
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-blue-500/50"></span>
-              <span>跨維度天賦分析</span>
-            </div>
-          </div>
         </div>
       </main>
-
-      <footer className="mt-12 py-10 border-t border-slate-900 text-center space-y-2">
-        <p className="text-slate-600 text-xs font-medium uppercase tracking-widest">
-          CelestialLens Destiny System
-        </p>
-        <p className="text-slate-800 text-[10px] max-w-lg mx-auto leading-relaxed px-6">
-          本系統運用人工智慧進行模擬分析，所有命理數據僅供決策參考。請以積極心態規劃人生，把握每一次選擇的權利。
-        </p>
+      
+      <footer className="py-8 text-center border-t border-slate-900/50 mt-12">
+        <p className="text-[10px] text-slate-700 uppercase tracking-[0.3em]">CelestialLens System v3.0</p>
       </footer>
     </div>
   );
