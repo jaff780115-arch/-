@@ -16,10 +16,10 @@ st.set_page_config(
 st.markdown("""
     <style>
     .main { background-color: #020617; color: #f8fafc; }
-    .stButton>button { width: 100%; border-radius: 12px; height: 3rem; font-weight: bold; background: linear-gradient(45deg, #f59e0b, #ea580c); color: white; border: none; }
-    .stButton>button:hover { transform: scale(1.02); transition: 0.2s; }
-    .stTextArea textarea { font-family: 'Courier New', Courier, monospace; background-color: #0f172a; color: #cbd5e1; }
-    .reportview-container .main .block-container { padding-top: 2rem; }
+    .stButton>button { width: 100%; border-radius: 12px; height: 3.5rem; font-weight: bold; background: linear-gradient(45deg, #f59e0b, #ea580c); color: white; border: none; font-size: 1.1rem; }
+    .stButton>button:hover { transform: scale(1.02); transition: 0.2s; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); }
+    .stTextArea textarea { font-family: 'Courier New', Courier, monospace; background-color: #0f172a; color: #cbd5e1; border-color: #1e293b; }
+    .stSelectbox label, .stTextInput label { color: #94a3b8 !important; font-size: 0.8rem !important; text-transform: uppercase; letter-spacing: 1px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -37,7 +37,7 @@ def init_gemini():
         return True
     return False
 
-# 指令集定義
+# 3. 資料定義
 PROMPT_CATEGORIES = {
     "一. 基本解讀": [
         {"label": "八字顧問綜合分析", "template": "請你當我的八字顧問，詳細分析這張截圖的命主性格，日主五行、身強或身弱。\n\n並請依序解讀：\na. 根據格局，提議多元且符合現代趨勢的工作事業方式。\nb. 分析我的財務能量與五行喜忌用神。\nc. 分析命盤所有不同階段的十年大運，與十神的特性(請附整理表格)。\n備註： 我是 [男] 性。"}
@@ -54,121 +54,115 @@ PROMPT_CATEGORIES = {
         {"label": "三元九運：離火運策略", "template": "在三元九運的「離火運」下，如何發揮我的事業天賦與商業模式？"},
         {"label": "當前大運天賦發揮", "template": "在我目前的大運狀態下，如何發揮我的天賦？"},
         {"label": "職業戰略家模式", "template": "請你進入『職業戰略家』模式。根據剛才解析的八字十神格局，我注意到我有 [強項 A：{strength_a}] 與 [強項 B：{strength_b}] 這兩種能量。\n\n請幫我依序進行以下探索：\na. 化學反應分析：這兩種能量結合時，會產生什麼樣的『獨特工作風格』？\nb. 跨領域提案：請提出 3 個非傳統、具備未來感的『職業組合』，這些組合必須能同時發揮我的技術才華與內在價值感。\nc. 避坑指南：在整合這些能力時，我最容易遇到的『自我內耗』點是什麼？"}
-    ],
-    "四. 語氣風格轉換": [
-        {"label": "白話解讀", "template": "請幫我將以上分析，用白話的方式解讀。"},
-        {"label": "身心靈解讀", "template": "請幫我將以上分析，用身心靈的方式解讀。"},
-        {"label": "能量角度解讀", "template": "請幫我將以上分析，用能量的方式解讀。"}
     ]
 }
 
-# 側邊欄 UI
+STYLE_OPTIONS = {
+    "預設風格": "",
+    "白話解讀": "\n\n請幫我將以上分析，用非常白話、好理解的方式解讀。",
+    "身心靈解讀": "\n\n請幫我將以上分析，用身心靈與內在探索的方式解讀。",
+    "能量角度解讀": "\n\n請幫我將以上分析，從能量場與頻率的角度進行解讀。"
+}
+
+# 4. 側邊欄 UI
 with st.sidebar:
-    st.title("🔮 CelestialLens Pro")
+    st.title("🔮 CelestialLens Flash")
+    st.caption("AI 命理戰略系統 v3.0")
     st.markdown("---")
     
     is_ready = init_gemini()
     
-    st.subheader("⚙️ 模型設定")
-    # 提供模型選擇，解決配額問題
-    model_choice = st.radio(
-        "選擇 AI 模型",
-        ["gemini-3-flash-preview", "gemini-3-pro-preview"],
-        index=0,
-        help="如果 Pro 出現 Quota Exceeded (429) 錯誤，請切換至 Flash。Flash 速度更快且免費配額更多。"
-    )
+    st.subheader("🛠️ 指令配置")
+    
+    # 三段式選單
+    cat_name = st.selectbox("1. 功能分類", list(PROMPT_CATEGORIES.keys()))
+    
+    items_in_cat = PROMPT_CATEGORIES[cat_name]
+    selected_label = st.selectbox("2. 具體指令", [i["label"] for i in items_in_cat])
+    
+    style_name = st.selectbox("3. 語氣風格", list(STYLE_OPTIONS.keys()))
+    
+    # 取得範本與後綴
+    template = next(i["template"] for i in items_in_cat if i["label"] == selected_label)
+    style_suffix = STYLE_OPTIONS[style_name]
     
     st.markdown("---")
-    st.subheader("1. 選擇策略指令")
-    cat = st.selectbox("功能分類", list(PROMPT_CATEGORIES.keys()))
-    selected_label = st.selectbox("具體指令", [i["label"] for i in PROMPT_CATEGORIES[cat]])
-    template = next(i["template"] for i in PROMPT_CATEGORIES[cat] if i["label"] == selected_label)
+    st.subheader("📝 參數輸入")
+    job = st.text_input("目前職業", placeholder="例如：軟體工程師")
+    sa = st.text_input("強項 A", placeholder="例如：邏輯分析")
+    sb = st.text_input("強項 B", placeholder="例如：創意寫作")
+    
+    # 合成提示詞
+    final_prompt = template.replace("{current_job}", job if job else "[自由業]") \
+                           .replace("{strength_a}", sa if sa else "[未指定]") \
+                           .replace("{strength_b}", sb if sb else "[未指定]")
+    
+    final_prompt += style_suffix
     
     st.markdown("---")
-    st.subheader("2. 參數設定")
-    job = st.text_input("目前職業")
-    sa = st.text_input("強項 A")
-    sb = st.text_input("強項 B")
-    
-    final_prompt = template.replace("{current_job}", job).replace("{strength_a}", sa).replace("{strength_b}", sb)
-    prompt_to_send = st.text_area("終端指令預覽：", value=final_prompt, height=200)
+    prompt_to_send = st.text_area("終端指令預覽：", value=final_prompt, height=150)
 
-# 主畫面 UI
+# 5. 主畫面 UI
 st.title("CelestialLens AI 命盤深度解讀")
-st.markdown("---")
+st.info("💡 目前預設使用 **Gemini 3 Flash** 模型，提供最穩定且快速的解讀體驗。")
 
 uploaded_files = st.file_uploader("📸 請上傳命盤截圖 (可多選)", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 
 if uploaded_files:
-    cols = st.columns(min(len(uploaded_files), 4))
+    # 顯示上傳圖片縮圖
+    cols = st.columns(min(len(uploaded_files), 5))
     for i, file in enumerate(uploaded_files):
-        with cols[i % 4]:
+        with cols[i % 5]:
             st.image(file, use_container_width=True)
 
 st.markdown("---")
 
-if st.button("🌟 啟動 Pro 思考模式解讀", type="primary"):
+if st.button("🌟 啟動 AI 智慧命理分析", type="primary"):
     if not is_ready:
         st.error("請先設定 API Key")
     elif not uploaded_files:
-        st.warning("請先上傳命盤圖片")
+        st.warning("請先上傳命盤截圖")
     else:
-        with st.spinner(f"正在使用 {model_choice} 進行深度分析..."):
+        with st.spinner("正在接收星辰智慧..."):
             try:
+                # 建立模型實例
                 model = genai.GenerativeModel(
-                    model_name=model_choice,
-                    system_instruction="你是一位精通八字與紫微的專家。請用 Markdown 表格與清單詳細解讀。若是思考模式模型，請展示深度推理過程。"
+                    model_name="gemini-3-flash-preview",
+                    system_instruction="你是一位精通八字、紫微斗數與現代職涯戰略的命理專家。請使用 Markdown 格式提供專業解讀。應包含表格整理與重點條列。"
                 )
 
+                # 準備輸入資料
                 inputs = []
                 for f in uploaded_files:
-                    inputs.append(Image.open(f))
+                    img = Image.open(f)
+                    inputs.append(img)
                 inputs.append(prompt_to_send)
 
-                # 嘗試帶入思考預算
-                gen_config = genai.types.GenerationConfig(temperature=0.8)
-                
-                # 只有 Pro 模型或特定預覽版模型支援 thinking_config
-                thinking_params = {"thinking_budget": 32768} if "pro" in model_choice else None
+                # 發送請求
+                response = model.generate_content(
+                    inputs,
+                    generation_config=genai.types.GenerationConfig(temperature=0.7),
+                    stream=True
+                )
 
-                if thinking_params:
-                    response = model.generate_content(
-                        inputs,
-                        generation_config=gen_config,
-                        thinking_config=thinking_params,
-                        stream=True
-                    )
-                else:
-                    response = model.generate_content(
-                        inputs,
-                        generation_config=gen_config,
-                        stream=True
-                    )
-
-                st.subheader("📝 分析結果")
+                st.subheader("📝 深度分析報告")
                 res_area = st.empty()
                 full_text = ""
+                
                 for chunk in response:
                     if chunk.text:
                         full_text += chunk.text
                         res_area.markdown(full_text)
-                st.success("分析完成")
+                
+                st.success("解讀完成")
+                st.balloons()
                 
             except Exception as e:
                 err_msg = str(e)
-                if "429" in err_msg or "quota" in err_msg.lower():
-                    st.error("🚨 **配額超出限制 (Quota Exceeded)**")
-                    st.info("""
-                    **為什麼會這樣？**
-                    1. 您使用的是免費版 API Key，Google 對 Pro 模型的限制非常嚴格。
-                    2. 即使您有訂閱 Gemini Advanced，API 仍需獨立開啟 [Pay-as-you-go](https://ai.google.dev/pricing) 才能獲得高配額。
-                    
-                    **建議解決方法：**
-                    *   在左側邊欄將模型切換為 **gemini-3-flash-preview** (配額多很多)。
-                    *   等待一分鐘後再試。
-                    """)
+                if "429" in err_msg:
+                    st.error("🚨 配額超出限制：請等待 60 秒後再試，或更換 API Key。")
                 else:
-                    st.error(f"發生錯誤：{err_msg}")
+                    st.error(f"分析失敗：{err_msg}")
 
 st.markdown("---")
-st.caption("© 2025 CelestialLens • 如果您已付費但仍看到 429，請確認是否已在 Google AI Studio 開啟 Billing。")
+st.caption("© 2025 CelestialLens • Powered by Gemini 3 Flash")
