@@ -12,15 +12,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 自定義 CSS：強化隱藏 Header 與 Footer
+# 自定義 CSS：精確隱藏「原始碼」按鈕，同時確保手機版選單正常顯示
 st.markdown("""
     <style>
-    /* 隱藏頂部工具列 (包含 View Source, GitHub 圖示等) */
-    header[data-testid="stHeader"] {
-        visibility: hidden;
-        height: 0%;
+    /* 隱藏頂部工具列中的特定按鈕，但保留漢堡選單 */
+    div[data-testid="stToolbar"] {
+        display: none !important;
     }
     
+    /* 隱藏部署按鈕 */
+    button[data-testid="stHeaderDeployButton"] {
+        display: none !important;
+    }
+
     /* 隱藏底部標籤 */
     footer {
         visibility: hidden;
@@ -48,25 +52,30 @@ st.markdown("""
     .stTextArea textarea { font-family: 'Courier New', Courier, monospace; background-color: #0f172a; color: #cbd5e1; border-color: #1e293b; }
     .stSelectbox label, .stTextInput label { color: #94a3b8 !important; font-size: 0.8rem !important; text-transform: uppercase; letter-spacing: 1px; }
     
-    /* 調整主要內容區域，補償 header 隱藏後的間距 */
     .block-container {
-        padding-top: 2rem !important;
+        padding-top: 1.5rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. 安全取得 API Key
+# 2. 安全取得 API Key 邏輯
 def init_gemini():
     api_key = None
+    # 優先嘗試從 Secrets 讀取
     if "GEMINI_API_KEY" in st.secrets:
         api_key = st.secrets["GEMINI_API_KEY"]
     
+    # 接著檢查手動輸入的 Key
     if not api_key:
-        api_key = st.sidebar.text_input("🔑 請輸入 Gemini API Key", type="password", help="請前往 Google AI Studio 取得 Key")
+        if "manual_api_key" in st.session_state:
+            api_key = st.session_state["manual_api_key"]
     
     if api_key:
-        genai.configure(api_key=api_key)
-        return True
+        try:
+            genai.configure(api_key=api_key)
+            return True
+        except Exception:
+            return False
     return False
 
 # 3. 資料定義
@@ -96,22 +105,29 @@ STYLE_OPTIONS = {
     "能量角度解讀": "\n\n請幫我將以上分析，從能量場與頻率的角度進行解讀。"
 }
 
-# 4. 側邊欄 UI
+# 4. 初始化檢查
+is_ready = init_gemini()
+
+# 5. 側邊欄 UI
 with st.sidebar:
     st.title("🔮 CelestialLens")
-    st.caption("AI 命理戰略系統 v3.1")
+    st.caption("AI 命理戰略系統 v3.2")
     st.markdown("---")
-    
-    is_ready = init_gemini()
     
     st.subheader("🛠️ 指令配置")
     
     cat_name = st.selectbox("1. 功能分類", list(PROMPT_CATEGORIES.keys()))
     items_in_cat = PROMPT_CATEGORIES[cat_name]
+    
     selected_label = st.selectbox("2. 具體指令", [i["label"] for i in items_in_cat])
     style_name = st.selectbox("3. 語氣風格", list(STYLE_OPTIONS.keys()))
     
-    template = next(i["template"] for i in items_in_cat if i["label"] == selected_label)
+    # 增加安全性防護，避免手機版選單切換時出錯
+    try:
+        template = next(i["template"] for i in items_in_cat if i["label"] == selected_label)
+    except StopIteration:
+        template = items_in_cat[0]["template"]
+        
     style_suffix = STYLE_OPTIONS[style_name]
     
     st.markdown("---")
@@ -129,16 +145,27 @@ with st.sidebar:
     st.markdown("---")
     prompt_to_send = st.text_area("終端指令預覽：", value=final_prompt, height=150)
 
-# 5. 主畫面 UI
-st.title("CelestialLens AI 命盤深度解讀")
-st.info("💡 目前使用 **Gemini 3 Flash** 引擎。")
+# 6. 主畫面 UI
+st.title("CelestialLens AI 深度解讀")
 
-uploaded_files = st.file_uploader("📸 請上傳命盤截圖 (可多選)", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
+# 若無 API Key，直接在主畫面引導輸入，對手機用戶更友善
+if not is_ready:
+    st.warning("⚠️ 系統尚未就緒：請在下方或側邊欄輸入您的 Gemini API Key。")
+    manual_key = st.text_input("🔑 請輸入您的 Gemini API Key", type="password")
+    if manual_key:
+        st.session_state["manual_api_key"] = manual_key
+        st.rerun()
+
+st.info("💡 採用 **Gemini 3 Flash** 引擎。")
+
+uploaded_files = st.file_uploader("📸 上傳命盤截圖 (可多選)", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 
 if uploaded_files:
-    cols = st.columns(min(len(uploaded_files), 5))
+    # 手機版自動調整列數，避免畫面過窄 (最多兩列)
+    num_cols = 2 if len(uploaded_files) > 1 else 1
+    cols = st.columns(num_cols)
     for i, file in enumerate(uploaded_files):
-        with cols[i % 5]:
+        with cols[i % num_cols]:
             st.image(file, use_container_width=True)
 
 st.markdown("---")
@@ -151,6 +178,10 @@ if st.button("🌟 啟動 AI 智慧命理分析", type="primary"):
     else:
         with st.spinner("正在接收星辰智慧..."):
             try:
+                # 再次確認配置
+                api_key_to_use = st.secrets.get("GEMINI_API_KEY") or st.session_state.get("manual_api_key")
+                genai.configure(api_key=api_key_to_use)
+                
                 model = genai.GenerativeModel(
                     model_name="gemini-3-flash-preview",
                     system_instruction="你是一位精通八字、紫微斗數與現代職涯戰略的命理專家。請使用 Markdown 格式提供專業解讀。應包含表格整理與重點條列。"
