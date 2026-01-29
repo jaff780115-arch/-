@@ -12,15 +12,23 @@ st.set_page_config(
 )
 
 # 2. 安全取得 API Key (從 Streamlit Secrets)
-# 在 Streamlit Cloud 部署後，請在 Settings -> Secrets 中設定 GEMINI_API_KEY
 try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-except Exception:
-    st.error("請先在 .streamlit/secrets.toml 或 Streamlit 後台設定 GEMINI_API_KEY")
+    if "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    else:
+        # 兼容本地開發環境
+        api_key = st.sidebar.text_input("請輸入 API Key (僅限本地測試)", type="password")
+    
+    if api_key:
+        genai.configure(api_key=api_key)
+    else:
+        st.warning("請在 Streamlit Secrets 或側邊欄設定 GEMINI_API_KEY")
+        st.stop()
+except Exception as e:
+    st.error("API 設定失敗，請檢查 Secrets 配置。")
     st.stop()
 
-# 3. 定義指令集 (與網頁版同步)
+# 3. 定義指令集
 PROMPT_CATEGORIES = {
     "一. 基本解讀": [
         {"label": "八字顧問綜合分析", "template": "請你當我的八字顧問，詳細分析這張截圖的命主性格，日主五行、身強或身弱。\n\n並請依序解讀：\na. 根據格局，提議多元且符合現代趨勢的工作事業方式。\nb. 分析我的財務能量與五行喜忌用神。\nc. 分析命盤所有不同階段的十年大運，與十神的特性(請附整理表格)。\n備註： 我是 [男] 性。"}
@@ -50,77 +58,75 @@ with st.sidebar:
     st.title("🔮 CelestialLens Pro")
     st.markdown("---")
     
-    st.subheader("1. 選取解讀模式")
-    category = st.selectbox("分類", list(PROMPT_CATEGORIES.keys()))
-    selected_item = st.selectbox("子項目", [i["label"] for i in PROMPT_CATEGORIES[category]])
+    category = st.selectbox("1. 選擇分類", list(PROMPT_CATEGORIES.keys()))
+    sub_items = [i["label"] for i in PROMPT_CATEGORIES[category]]
+    selected_label = st.selectbox("2. 選擇指令", sub_items)
     
-    # 找出選中的模板
-    template = next(i["template"] for i in PROMPT_CATEGORIES[category] if i["label"] == selected_item)
+    template = next(i["template"] for i in PROMPT_CATEGORIES[category] if i["label"] == selected_label)
     
-    st.subheader("2. 填寫變數資料")
-    current_job = st.text_input("目前從事職業 (OO)", placeholder="例如：產品經理")
-    col1, col2 = st.columns(2)
-    strength_a = col1.text_input("強項 A", placeholder="例如：直覺")
-    strength_b = col2.text_input("強項 B", placeholder="例如：邏輯")
+    st.markdown("---")
+    st.subheader("3. 填寫資料")
+    job = st.text_input("目前職業", placeholder="例：自由接案")
+    s_a = st.text_input("強項 A", placeholder="例：直覺")
+    s_b = st.text_input("強項 B", placeholder="例：美感")
     
-    # 替換變數
-    final_prompt = template.replace("{current_job}", current_job).replace("{strength_a}", strength_a).replace("{strength_b}", strength_b)
+    final_prompt = template.replace("{current_job}", job).replace("{strength_a}", s_a).replace("{strength_b}", s_b)
     
-    st.subheader("3. 最終指令預覽")
-    editable_prompt = st.text_area("您可以手動微調指令內容：", value=final_prompt, height=200)
+    st.subheader("4. 指令預覽")
+    prompt_text = st.text_area("可直接在此修改指令：", value=final_prompt, height=200)
 
-# 5. 主介面 UI
+# 5. 主內容區
 st.title("CelestialLens AI 命盤深度解讀")
-st.info("💡 提示：您可以同時上傳多張截圖，AI 將自動進行整合推理。")
+st.info("支援多圖上傳，AI 將進行跨圖整合分析。")
 
-uploaded_files = st.file_uploader("上傳命盤截圖 (八字/紫微/占星)", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
+files = st.file_uploader("上傳命盤截圖", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 
-if uploaded_files:
-    cols = st.columns(len(uploaded_files))
-    for idx, file in enumerate(uploaded_files):
-        with cols[idx]:
-            st.image(file, use_column_width=True)
+if files:
+    cols = st.columns(min(len(files), 4))
+    for i, f in enumerate(files):
+        with cols[i % 4]:
+            st.image(f, use_container_width=True)
 
 if st.button("🌟 啟動 Pro 思考模式解讀", type="primary"):
-    if not uploaded_files:
-        st.warning("請先上傳命盤截圖！")
+    if not files:
+        st.warning("請先上傳至少一張截圖")
     else:
-        with st.spinner("Gemini Pro 正在進行深度鏈式思考..."):
+        with st.spinner("Gemini Pro 思考中..."):
             try:
-                # 準備模型
-                # 注意：Python SDK 的思考模式設定方式
+                # 初始化模型
                 model = genai.GenerativeModel(
                     model_name='gemini-3-pro-preview',
-                    system_instruction="你是一位精通八字、紫微斗數、三元九運與現代職業戰略的頂尖玄學專家。你擅長將古老的東方智慧轉化為具備未來感、跨領域且符合現代趨勢的實戰建議。解讀時請使用 Markdown 格式，表格必須清晰。"
+                    system_instruction="你是一位精通八字、紫微、三元九運的玄學專家，擅長將古老智慧轉化為現代職涯建議。請使用 Markdown 格式回答。"
                 )
 
-                # 準備圖片資料
-                content_parts = []
-                for uploaded_file in uploaded_files:
-                    img = Image.open(uploaded_file)
-                    content_parts.append(img)
-                
-                content_parts.append(editable_prompt)
+                # 準備內容 (圖片 + 文字)
+                contents = []
+                for f in files:
+                    img = Image.open(f)
+                    contents.append(img)
+                contents.append(prompt_text)
 
-                # 呼叫 API (配置思考預算)
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.8,
-            ),
-            stream=True
-        )
-                # 串流輸出結果
-                output_area = st.empty()
-                full_text = ""
+                # 發送請求 (包含 Thinking Config)
+                response = model.generate_content(
+                    contents,
+                    generation_config={
+                        "temperature": 0.8,
+                        "thinking_config": {"thinking_budget": 32768}
+                    },
+                    stream=True
+                )
+
+                # 顯示結果
+                res_area = st.empty()
+                full_res = ""
                 for chunk in response:
-                    full_text += chunk.text
-                    output_area.markdown(full_text)
+                    if chunk.text:
+                        full_res += chunk.text
+                        res_area.markdown(full_res)
                 
-                st.success("解讀完成！")
-                
+                st.success("解讀完成")
             except Exception as e:
-                st.error(f"發生錯誤：{str(e)}")
+                st.error(f"分析發生錯誤: {str(e)}")
 
 st.markdown("---")
-st.caption("Powered by Gemini 3 Pro • CelestialLens Python Edition")
+st.caption("CelestialLens Python Pro Edition")
