@@ -12,15 +12,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 自定義 CSS：隱藏開發者工具，同時確保 UI 比例正確
+# 自定義 CSS：優化介面，但不遮蔽系統功能
 st.markdown("""
     <style>
-    /* 隱藏頂部工具列 (包含 View Source, GitHub 圖示等) */
-    header[data-testid="stHeader"] {
-        visibility: hidden;
-        height: 0%;
-    }
-    
     /* 隱藏底部標籤 */
     footer {
         visibility: hidden;
@@ -48,9 +42,8 @@ st.markdown("""
     .stTextArea textarea { font-family: 'Courier New', Courier, monospace; background-color: #0f172a; color: #cbd5e1; border-color: #1e293b; }
     .stSelectbox label, .stTextInput label { color: #94a3b8 !important; font-size: 0.8rem !important; text-transform: uppercase; letter-spacing: 1px; }
     
-    /* 調整主要內容區域，補償 header 隱藏後的間距 */
     .block-container {
-        padding-top: 2rem !important;
+        padding-top: 1.5rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -61,7 +54,7 @@ def init_gemini():
     if "GEMINI_API_KEY" in st.secrets:
         api_key = st.secrets["GEMINI_API_KEY"]
     
-    # 手機版若 Secrets 讀不到，檢查 Session
+    # 檢查手動輸入的 Key (用於手機版或未設定 Secrets 時)
     if not api_key and "manual_api_key" in st.session_state:
         api_key = st.session_state["manual_api_key"]
     
@@ -106,7 +99,7 @@ is_ready = init_gemini()
 # 5. 側邊欄 UI
 with st.sidebar:
     st.title("🔮 CelestialLens")
-    st.caption("AI 命理戰略系統 v3.1.1 (復原版)")
+    st.caption("AI 命理戰略系統 v3.1 Stable")
     st.markdown("---")
     
     st.subheader("🛠️ 指令配置")
@@ -116,7 +109,7 @@ with st.sidebar:
     selected_label = st.selectbox("2. 具體指令", [i["label"] for i in items_in_cat])
     style_name = st.selectbox("3. 語氣風格", list(STYLE_OPTIONS.keys()))
     
-    # 防止手機切換時的空值錯誤
+    # 防止切換時的空值錯誤
     try:
         template = next(i["template"] for i in items_in_cat if i["label"] == selected_label)
     except StopIteration:
@@ -142,7 +135,7 @@ with st.sidebar:
 # 6. 主畫面 UI
 st.title("CelestialLens AI 深度解讀")
 
-# API Key 安全檢查：若未就緒，顯示輸入框
+# API Key 安全檢查
 if not is_ready:
     st.warning("🔑 請輸入您的 Gemini API Key 以開始使用。")
     m_key = st.text_input("API Key", type="password")
@@ -155,7 +148,7 @@ st.info("💡 目前使用 **Gemini 3 Flash** 引擎。")
 uploaded_files = st.file_uploader("📸 請上傳命盤截圖 (可多選)", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 
 if uploaded_files:
-    # 恢復為寬螢幕 5 欄顯示，避免格式跑掉
+    # 恢復為寬螢幕 5 欄顯示
     cols = st.columns(min(len(uploaded_files), 5))
     for i, file in enumerate(uploaded_files):
         with cols[i % 5]:
@@ -171,7 +164,7 @@ if st.button("🌟 啟動 AI 智慧命理分析", type="primary"):
     else:
         with st.spinner("正在接收星辰智慧..."):
             try:
-                # 確保重新配置 API Key
+                # 確保配置
                 current_key = st.secrets.get("GEMINI_API_KEY") or st.session_state.get("manual_api_key")
                 genai.configure(api_key=current_key)
                 
