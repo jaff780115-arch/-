@@ -108,9 +108,6 @@ if st.button("🌟 啟動 Pro 思考模式解讀", type="primary"):
                     generation_config=genai.types.GenerationConfig(
                         temperature=0.8,
                         # Python SDK 的 Thinking 設定
-                        thinking_config={'thinking_budget': 32768}
-                    ),
-                    stream=True
                 )
 
                 # 串流輸出結果
