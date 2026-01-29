@@ -1,0 +1,7 @@
+{
+  "name": "CelestialLens - AI Destiny Interpreter",
+  "description": "A sophisticated web application that uses Gemini AI to analyze and interpret multiple birth chart screenshots (BaZi, Zi Wei Dou Shu, etc.) with custom expert prompts.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
