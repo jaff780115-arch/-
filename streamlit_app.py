@@ -48,12 +48,10 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. API Key 初始化 (簡化版)
+# 2. API Key 初始化 (完全自動化)
 def init_gemini():
+    # 僅從 secrets 讀取，不顯示任何 UI 輸入框
     api_key = st.secrets.get("GEMINI_API_KEY")
-    if not api_key:
-        api_key = st.sidebar.text_input("🔑 請輸入 Gemini API Key", type="password")
-    
     if api_key:
         genai.configure(api_key=api_key)
         return True
@@ -92,6 +90,7 @@ with st.sidebar:
     st.caption("AI 命理戰略系統 v3.1")
     st.markdown("---")
     
+    # 靜默初始化
     is_ready = init_gemini()
     
     st.subheader("🛠️ 指令配置")
@@ -119,7 +118,7 @@ with st.sidebar:
 
 # 5. 主畫面 UI
 st.title("CelestialLens AI 命盤深度解讀")
-st.info("💡 目前使用 **Gemini 3 Flash** 引擎。")
+st.info("💡 目前使用 **Gemini 3 Flash** 引擎。系統已自動載入安全性授權。")
 
 uploaded_files = st.file_uploader("📸 請上傳命盤截圖 (可多選)", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 
@@ -133,12 +132,13 @@ st.markdown("---")
 
 if st.button("🌟 啟動 AI 智慧命理分析", type="primary"):
     if not is_ready:
-        st.error("請在側邊欄輸入 API Key")
+        st.error("🚨 系統配置錯誤：未偵測到 API Key。請確保環境變數或 secrets.toml 已正確設定。")
     elif not uploaded_files:
         st.warning("請先上傳命盤截圖")
     else:
         with st.spinner("正在接收星辰智慧..."):
             try:
+                # 使用最新型號
                 model = genai.GenerativeModel(
                     model_name="gemini-3-flash-preview",
                     system_instruction="你是一位精通八字、紫微斗數與現代職涯戰略的命理專家。請使用 Markdown 格式提供專業解讀。應包含表格整理與重點條列。"
@@ -150,7 +150,7 @@ if st.button("🌟 啟動 AI 智慧命理分析", type="primary"):
                     inputs.append(img)
                 inputs.append(prompt_to_send)
 
-                response = model.generate_content(inputs, config={"temperature": 0.7})
+                response = model.generate_content(inputs, generation_config={"temperature": 0.7})
 
                 st.subheader("📝 深度分析報告")
                 st.markdown(response.text)
