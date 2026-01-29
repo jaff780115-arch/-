@@ -1,0 +1,8 @@
+
+[client]
+# 將工具列模式設定為 minimal，會隱藏右上角的 "View source" 與 GitHub 連結
+toolbarMode = "minimal"
+
+[browser]
+# 隱藏右下角的 "Made with Streamlit" 標記（可選）
+gatherUsageStats = false
